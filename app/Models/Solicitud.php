@@ -2,61 +2,56 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Solicitud extends Model
 {
-    use HasFactory;
+    protected $table = 'solicituds';
 
     protected $fillable = [
         'student_id',
         'tipo_solicitud_id',
-        'estado_actual_id',
-        'fecha_creacion',
-        'fecha_envio',
         'descripcion',
+        'estado_actual_id',
+        'fecha_envio',
         'observaciones_secretaria',
         'observaciones_decano',
     ];
 
     protected $casts = [
-        'fecha_creacion' => 'datetime',
         'fecha_envio' => 'datetime',
     ];
 
-    public function student()
+    public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
     }
 
-    public function tipoSolicitud()
+    public function tipoSolicitud(): BelongsTo
     {
-        return $this->belongsTo(TipoSolicitud::class);
+        return $this->belongsTo(TipoSolicitud::class, 'tipo_solicitud_id');
     }
 
-    public function estadoActual()
+    public function estadoActual(): BelongsTo
     {
         return $this->belongsTo(Estado::class, 'estado_actual_id');
     }
 
-    public function validacion()
+    // Historial de cambios (NO es tabla pivote, es tabla de historial)
+    public function historial(): HasMany
     {
-        return $this->hasOne(Validacion::class);
+        return $this->hasMany(HistorialEstado::class)->orderBy('fecha_cambio', 'desc');
     }
 
-    public function archivos()
+    public function archivosAdjuntos(): HasMany
     {
         return $this->hasMany(ArchivoAdjunto::class);
     }
 
-    public function historiales()
+    public function validaciones(): HasMany
     {
-        return $this->hasMany(HistorialEstado::class);
-    }
-
-    public function notificaciones()
-    {
-        return $this->hasMany(Notificacion::class);
+        return $this->hasMany(Validacion::class);
     }
 }

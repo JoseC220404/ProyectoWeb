@@ -2,21 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TipoSolicitud extends Model
 {
-    use HasFactory;
-
+    protected $table = 'tipo_solicituds';
+    
     protected $fillable = ['nombre', 'descripcion', 'disponible'];
 
-    protected $casts = [
-        'disponible' => 'boolean',
-    ];
-
-    public function solicitudes()
+    /**
+     * Una solicitud de tipo tiene muchas solicitudes
+     */
+    public function solicitudes(): HasMany
     {
-        return $this->hasMany(Solicitud::class);
+        return $this->hasMany(Solicitud::class, 'tipo_solicitud_id');
     }
 }

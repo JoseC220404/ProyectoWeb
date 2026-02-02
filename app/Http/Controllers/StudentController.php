@@ -5,18 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class StudentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $query = Student::with('user');
         
-        // Motor de búsqueda
-        if ($request->has('search') && $request->search != '') {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('user', function($q) use ($search) {
                 $q->where('first_name', 'LIKE', "%{$search}%")
@@ -25,22 +23,16 @@ class StudentController extends Controller
             })->orWhere('carrera', 'LIKE', "%{$search}%");
         }
         
-        $students = $query->paginate(10);
+        $students = $query->latest()->paginate(10);
         
         return view('students.index', compact('students'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         return view('students.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -52,46 +44,38 @@ class StudentController extends Controller
             'anio' => 'nullable|integer|min:1|max:5',
         ]);
 
-        // Crear usuario
-        $user = User::create([
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'password' => bcrypt($validated['password']),
-        ]);
+        DB::transaction(function () use ($validated) {
+            $user = User::create([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'is_active' => true,
+            ]);
 
-        // Crear estudiante
-        Student::create([
-            'user_id' => $user->id,
-            'carrera' => $validated['carrera'],
-            'anio' => $validated['anio'],
-        ]);
+            Student::create([
+                'user_id' => $user->id,
+                'carrera' => $validated['carrera'],
+                'anio' => $validated['anio'],
+            ]);
+        });
 
         return redirect()->route('students.index')
             ->with('success', 'Estudiante registrado exitosamente.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Student $student)
     {
-        $student->load('user', 'solicitudes.tipoSolicitud', 'solicitudes.estadoActual');
+        $student->load(['user', 'solicitudes.tipoSolicitud', 'solicitudes.estadoActual']);
         return view('students.show', compact('student'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Student $student)
     {
         $student->load('user');
         return view('students.edit', compact('student'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Student $student)
     {
         $validated = $request->validate([
@@ -103,31 +87,31 @@ class StudentController extends Controller
             'is_active' => 'required|boolean',
         ]);
 
-        // Actualizar usuario
-        $student->user->update([
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'email' => $validated['email'],
-            'is_active' => $validated['is_active'],
-        ]);
+        DB::transaction(function () use ($validated, $student) {
+            $student->user->update([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'is_active' => $validated['is_active'],
+            ]);
 
-        // Actualizar estudiante
-        $student->update([
-            'carrera' => $validated['carrera'],
-            'anio' => $validated['anio'],
-        ]);
+            $student->update([
+                'carrera' => $validated['carrera'],
+                'anio' => $validated['anio'],
+            ]);
+        });
 
         return redirect()->route('students.index')
             ->with('success', 'Estudiante actualizado exitosamente.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Student $student)
     {
-        $student->user->delete();
-        $student->delete();
+        DB::transaction(function () use ($student) {
+            $user = $student->user;
+            $student->delete();
+            $user->delete();
+        });
 
         return redirect()->route('students.index')
             ->with('success', 'Estudiante eliminado exitosamente.');
